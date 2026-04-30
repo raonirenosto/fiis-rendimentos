@@ -22,6 +22,10 @@ function getMesAno(dataStr) {
   return `${ano}-${mes}`;
 }
 
+function getAno(mesStr) {
+  return mesStr.split("-")[0];
+}
+
 function formatMes(mesStr) {
   const [ano, mes] = mesStr.split("-");
   const meses = [
@@ -42,7 +46,6 @@ let registros = [];
 for (let i = 0; i < linhas.length; i += 10) {
   const ticker = linhas[i];
 
-  // apenas FIIs e remove PVBI11
   if (!ticker.endsWith("11") || ticker === "PVBI11") continue;
 
   registros.push({
@@ -79,28 +82,7 @@ for (const ticker in dados) {
 // ===== ORDENAR =====
 const meses = Array.from(mesesSet).sort();
 const tickers = Object.keys(dados).sort();
-
-// ===== BASELINE =====
-function encontrarBaseline(mesesOrdenados, dadosTicker) {
-  for (let i = 0; i < mesesOrdenados.length; i++) {
-    const mes = mesesOrdenados[i];
-    const info = dadosTicker[mes];
-    if (!info) continue;
-
-    const mesNumero = parseInt(mes.split("-")[1]);
-
-    if (mesNumero === 1 || mesNumero === 7) {
-      for (let j = i + 1; j < mesesOrdenados.length; j++) {
-        if (dadosTicker[mesesOrdenados[j]]) {
-          return mesesOrdenados[j];
-        }
-      }
-    }
-
-    return mes;
-  }
-  return null;
-}
+const anos = [...new Set(meses.map(m => getAno(m)))];
 
 // ===== HTML =====
 let html = `
@@ -117,6 +99,10 @@ body {
 .container {
   max-width: 1600px;
   margin: auto;
+}
+
+select {
+  padding: 6px 10px;
 }
 
 table {
@@ -136,11 +122,8 @@ th, td {
   text-align: center;
 }
 
-/* zebra */
 tbody tr:nth-child(even) { background: #e8f0ff; }
-tbody tr:nth-child(odd) { background: #ffffff; }
 
-/* evita quebra */
 .valor {
   white-space: nowrap;
   font-weight: 600;
@@ -166,11 +149,18 @@ tbody tr:nth-child(odd) { background: #ffffff; }
 <div class="container">
 <h2>📊 Dividendos por Cota</h2>
 
+<select id="filtroAno" onchange="filtrarAno()">
+  <option value="todos">Todos</option>
+  ${anos.map(a => `<option value="${a}">${a}</option>`).join("")}
+</select>
+
+<br><br>
+
 <table>
 <thead>
 <tr>
 <th>Ticker</th>
-${meses.map(m => `<th>${formatMes(m)}</th>`).join("")}
+${meses.map(m => `<th data-ano="${getAno(m)}">${formatMes(m)}</th>`).join("")}
 <th>% Var</th>
 </tr>
 </thead>
@@ -179,61 +169,24 @@ ${meses.map(m => `<th>${formatMes(m)}</th>`).join("")}
 
 // ===== PREENCHER =====
 for (const ticker of tickers) {
-  const dadosTicker = dados[ticker];
-
-  const baselineMes = encontrarBaseline(meses, dadosTicker);
-  const mesesValidos = meses.filter(m => dadosTicker[m]);
-  const ultimoMes = mesesValidos[mesesValidos.length - 1];
-
-  const base = baselineMes ? dadosTicker[baselineMes].valorPorCota : null;
-  const ultimo = ultimoMes ? dadosTicker[ultimoMes].valorPorCota : null;
-
-  let variacao = null;
-  if (base && ultimo) {
-    variacao = ((ultimo - base) / base) * 100;
-  }
-
   html += `<tr><td class="ticker">${ticker}</td>`;
 
   for (const mes of meses) {
-    const atual = dadosTicker[mes];
+    const atual = dados[ticker][mes];
 
     if (!atual) {
-      html += `<td>-</td>`;
+      html += `<td data-ano="${getAno(mes)}">-</td>`;
       continue;
     }
 
-    let classe = "";
-
-    if (mes === baselineMes) classe = "orange";
-
-    if (mes === ultimoMes && base !== null) {
-      const diff = atual.valorPorCota - base;
-      const tol = 0.0001;
-
-      if (diff > tol) classe = "green";
-      else if (diff < -tol) classe = "red";
-    }
-
     html += `
-      <td class="${classe}">
+      <td data-ano="${getAno(mes)}">
         <span class="valor">R$ ${atual.valorPorCota.toFixed(2)}</span>
       </td>
     `;
   }
 
-  // coluna %
-  let classeVar = "";
-  let textoVar = "-";
-
-  if (variacao !== null) {
-    if (variacao > 0.01) classeVar = "green";
-    else if (variacao < -0.01) classeVar = "red";
-
-    textoVar = `${variacao.toFixed(2)}%`;
-  }
-
-  html += `<td class="col-var ${classeVar}">${textoVar}</td>`;
+  html += `<td class="col-var">-</td>`;
   html += `</tr>`;
 }
 
@@ -241,6 +194,111 @@ html += `
 </tbody>
 </table>
 </div>
+
+<script>
+function limparClasses(td) {
+  td.classList.remove("orange","green","red");
+}
+
+function calcularTabela() {
+  const anoSelecionado = document.getElementById("filtroAno").value;
+
+  const linhas = document.querySelectorAll("tbody tr");
+
+  linhas.forEach(linha => {
+    const celulas = linha.querySelectorAll("td[data-ano]");
+    const celulaVar = linha.querySelector(".col-var");
+
+    let dados = [];
+
+    celulas.forEach(td => {
+      const ano = td.dataset.ano;
+      const texto = td.innerText.trim();
+
+      if (!texto || texto === "-") return;
+
+      const valor = parseFloat(texto.replace("R$", "").replace(",", "."));
+
+      if (anoSelecionado === "todos" || ano === anoSelecionado) {
+        dados.push({ td, valor, ano });
+      }
+
+      limparClasses(td);
+    });
+
+    if (dados.length === 0) {
+      celulaVar.innerText = "-";
+      celulaVar.classList.remove("green","red");
+      return;
+    }
+
+    // baseline
+    let baselineIndex = 0;
+
+    for (let i = 0; i < dados.length; i++) {
+      const th = document.querySelectorAll("th")[dados[i].td.cellIndex];
+      const nomeMes = th.innerText.toLowerCase();
+
+      if (nomeMes.includes("janeiro") || nomeMes.includes("julho")) {
+        if (i + 1 < dados.length) {
+          baselineIndex = i + 1;
+        }
+      } else {
+        baselineIndex = i;
+      }
+      break;
+    }
+
+    const baseline = dados[baselineIndex];
+    const ultimo = dados[dados.length - 1];
+
+    baseline.td.classList.add("orange");
+
+    const diff = ultimo.valor - baseline.valor;
+    const tol = 0.0001;
+
+    if (diff > tol) ultimo.td.classList.add("green");
+    else if (diff < -tol) ultimo.td.classList.add("red");
+
+    let variacao = ((ultimo.valor - baseline.valor) / baseline.valor) * 100;
+
+    if (!isNaN(variacao)) {
+      celulaVar.innerText = variacao.toFixed(2) + "%";
+      celulaVar.classList.remove("green","red");
+
+      if (variacao > 0.01) celulaVar.classList.add("green");
+      else if (variacao < -0.01) celulaVar.classList.add("red");
+    } else {
+      celulaVar.innerText = "-";
+    }
+  });
+}
+
+function filtrarAno() {
+  const ano = document.getElementById("filtroAno").value;
+
+  const ths = document.querySelectorAll("th[data-ano]");
+  const tds = document.querySelectorAll("td[data-ano]");
+
+  if (ano === "todos") {
+    ths.forEach(th => th.style.display = "");
+    tds.forEach(td => td.style.display = "");
+  } else {
+    ths.forEach(th => {
+      th.style.display = th.dataset.ano === ano ? "" : "none";
+    });
+
+    tds.forEach(td => {
+      td.style.display = td.dataset.ano === ano ? "" : "none";
+    });
+  }
+
+  calcularTabela();
+}
+
+window.onload = calcularTabela;
+</script>
+
 </body>
 </html>
 `;
