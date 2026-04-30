@@ -42,6 +42,7 @@ let registros = [];
 for (let i = 0; i < linhas.length; i += 10) {
   const ticker = linhas[i];
 
+  // apenas FIIs e remove PVBI11
   if (!ticker.endsWith("11") || ticker === "PVBI11") continue;
 
   registros.push({
@@ -135,19 +136,28 @@ th, td {
   text-align: center;
 }
 
+/* zebra */
 tbody tr:nth-child(even) { background: #e8f0ff; }
+tbody tr:nth-child(odd) { background: #ffffff; }
+
+/* evita quebra */
+.valor {
+  white-space: nowrap;
+  font-weight: 600;
+}
 
 .ticker {
   font-weight: bold;
   background: #c7dbff;
 }
 
-.orange { background: #ffe9cc !important; font-weight: bold; }
-.green { background: #e6ffed !important; color: #166534; font-weight: bold; }
-.red { background: #ffe5e5 !important; color: #b91c1c; font-weight: bold; }
+.orange { background: #ffe9cc !important; }
+.green { background: #e6ffed !important; color: #166534; }
+.red { background: #ffe5e5 !important; color: #b91c1c; }
 
 .col-var {
   font-weight: bold;
+  white-space: nowrap;
 }
 </style>
 </head>
@@ -205,10 +215,14 @@ for (const ticker of tickers) {
       else if (diff < -tol) classe = "red";
     }
 
-    html += `<td class="${classe}">R$ ${atual.valorPorCota.toFixed(2)}</td>`;
+    html += `
+      <td class="${classe}">
+        <span class="valor">R$ ${atual.valorPorCota.toFixed(2)}</span>
+      </td>
+    `;
   }
 
-  // ===== coluna %
+  // coluna %
   let classeVar = "";
   let textoVar = "-";
 
@@ -220,7 +234,6 @@ for (const ticker of tickers) {
   }
 
   html += `<td class="col-var ${classeVar}">${textoVar}</td>`;
-
   html += `</tr>`;
 }
 
