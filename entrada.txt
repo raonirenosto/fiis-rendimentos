@@ -1,4 +1,114 @@
 
+TGAR11
+FIIs
+A Receber
+Dividendos
+30/04/2026
+15/05/2026
+521,00
+R$ 0,72
+R$ 375,12
+R$ 375,12
+
+TRXF11
+FIIs
+A Receber
+Dividendos
+30/04/2026
+15/05/2026
+553,00
+R$ 0,93
+R$ 514,29
+R$ 514,29
+
+VISC11
+FIIs
+A Receber
+Dividendos
+30/04/2026
+15/05/2026
+441,00
+R$ 0,84
+R$ 370,44
+R$ 370,44
+
+BRCO11
+FIIs
+A Receber
+Dividendos
+30/04/2026
+15/05/2026
+280,00
+R$ 0,95
+R$ 266,00
+R$ 266,00
+
+PMLL11
+FIIs
+A Receber
+Dividendos
+30/04/2026
+15/05/2026
+501,00
+R$ 1,00
+R$ 501,00
+R$ 501,00
+
+KNRI11
+FIIs
+A Receber
+Dividendos
+30/04/2026
+15/05/2026
+215,00
+R$ 1,10
+R$ 236,50
+R$ 236,50
+
+XPLG11
+FIIs
+A Receber
+Dividendos
+30/04/2026
+15/05/2026
+359,00
+R$ 0,82
+R$ 294,38
+R$ 294,38
+
+HGLG11
+FIIs
+A Receber
+Dividendos
+30/04/2026
+15/05/2026
+227,00
+R$ 1,10
+R$ 249,70
+R$ 249,70
+
+HGRU11
+FIIs
+A Receber
+Dividendos
+30/04/2026
+15/05/2026
+237,00
+R$ 0,95
+R$ 225,15
+R$ 225,15
+
+GARE11
+FIIs
+A Receber
+Dividendos
+30/04/2026
+08/05/2026
+5.867,00
+R$ 0,08
+R$ 486,96
+R$ 486,96
+
 XPML11
 FIIs
 Pago
@@ -218,6 +328,7 @@ Dividendos
 R$ 0,80
 R$ 516,00
 R$ 516,00
+
 
 PMLL11
 FIIs
@@ -549,6 +660,7 @@ R$ 1,10
 R$ 110,00
 R$ 110,00
 
+
 PVBI11
 FIIs
 Pago
@@ -879,6 +991,7 @@ R$ 0,92
 R$ 275,08
 R$ 275,08
 
+
 BTLG11
 FIIs
 Pago
@@ -1208,6 +1321,7 @@ Dividendos
 R$ 0,80
 R$ 320,00
 R$ 320,00
+
 
 PVBI11
 FIIs
