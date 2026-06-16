@@ -1,22 +1,13 @@
 const fs = require("fs");
 const { exec } = require("child_process");
 const path = require("path");
+const { lerListaFiis, lerCache, salvarCache, mergeRendimentos } = require("./dados");
+const { buscarDividendos } = require("./api");
 
 // ===== CONFIG =====
-const INPUT_FILE = "entrada.txt";
 const OUTPUT_FILE = "resultado.html";
 
 // ===== FUNÇÕES =====
-function parseMoney(valor) {
-  return parseFloat(
-    valor.replace("R$", "").replace(/\./g, "").replace(",", ".").trim()
-  );
-}
-
-function parseNumber(valor) {
-  return parseFloat(valor.replace(/\./g, "").replace(",", "."));
-}
-
 function getMesAno(dataStr) {
   const [dia, mes, ano] = dataStr.split("/");
   return `${ano}-${mes}`;
@@ -36,56 +27,41 @@ function formatMes(mesStr) {
   return `${meses[parseInt(mes) - 1]} ${ano}`;
 }
 
-// ===== LEITURA =====
-const raw = fs.readFileSync(INPUT_FILE, "utf-8");
-const linhas = raw.split("\n").map(l => l.trim()).filter(l => l);
+// ===== GERAÇÃO HTML =====
+function gerarHTML(registrosParam) {
+  const cache = registrosParam || lerCache();
+  const fiis = lerListaFiis();
 
-// ===== PARSE =====
-let registros = [];
+  // Filtrar apenas FIIs da lista (termina em 11)
+  const registros = cache.filter(r => fiis.includes(r.ticker) && r.ticker.endsWith("11"));
 
-for (let i = 0; i < linhas.length; i += 10) {
-  const ticker = linhas[i];
+  // Agrupar por ticker e mês (usando data_pagamento)
+  const dados = {};
+  const mesesSet = new Set();
 
-  if (!ticker.endsWith("11") || ticker === "PVBI11") continue;
+  for (const r of registros) {
+    const mes = getMesAno(r.data_pagamento);
+    mesesSet.add(mes);
 
-  registros.push({
-    ticker,
-    mes: getMesAno(linhas[i + 5]),
-    qtd: parseNumber(linhas[i + 6]),
-    total: parseMoney(linhas[i + 8]),
-  });
-}
-
-// ===== AGRUPAR =====
-const dados = {};
-const mesesSet = new Set();
-
-for (const r of registros) {
-  mesesSet.add(r.mes);
-
-  if (!dados[r.ticker]) dados[r.ticker] = {};
-  if (!dados[r.ticker][r.mes]) {
-    dados[r.ticker][r.mes] = { qtd: r.qtd, total: 0 };
+    if (!dados[r.ticker]) dados[r.ticker] = {};
+    if (!dados[r.ticker][mes]) {
+      dados[r.ticker][mes] = { valorPorCota: 0 };
+    }
+    dados[r.ticker][mes].valorPorCota += r.valor_por_cota;
   }
 
-  dados[r.ticker][r.mes].total += r.total;
-}
-
-// ===== VALOR POR COTA =====
-for (const ticker in dados) {
-  for (const mes in dados[ticker]) {
-    const d = dados[ticker][mes];
-    d.valorPorCota = Number((d.total / d.qtd).toFixed(4));
+  // Arredondar valores
+  for (const ticker in dados) {
+    for (const mes in dados[ticker]) {
+      dados[ticker][mes].valorPorCota = Number(dados[ticker][mes].valorPorCota.toFixed(4));
+    }
   }
-}
 
-// ===== ORDENAR =====
-const meses = Array.from(mesesSet).sort();
-const tickers = Object.keys(dados).sort();
-const anos = [...new Set(meses.map(m => getAno(m)))];
+  const meses = Array.from(mesesSet).sort();
+  const tickers = Object.keys(dados).sort();
+  const anos = [...new Set(meses.map(m => getAno(m)))];
 
-// ===== HTML =====
-let html = `
+  let html = `
 <html>
 <head>
 <meta charset="UTF-8">
@@ -167,30 +143,29 @@ ${meses.map(m => `<th data-ano="${getAno(m)}">${formatMes(m)}</th>`).join("")}
 <tbody>
 `;
 
-// ===== PREENCHER =====
-for (const ticker of tickers) {
-  html += `<tr><td class="ticker">${ticker}</td>`;
+  for (const ticker of tickers) {
+    html += `<tr><td class="ticker">${ticker}</td>`;
 
-  for (const mes of meses) {
-    const atual = dados[ticker][mes];
+    for (const mes of meses) {
+      const atual = dados[ticker][mes];
 
-    if (!atual) {
-      html += `<td data-ano="${getAno(mes)}">-</td>`;
-      continue;
-    }
+      if (!atual) {
+        html += `<td data-ano="${getAno(mes)}">-</td>`;
+        continue;
+      }
 
-    html += `
+      html += `
       <td data-ano="${getAno(mes)}">
         <span class="valor">R$ ${atual.valorPorCota.toFixed(2)}</span>
       </td>
     `;
+    }
+
+    html += `<td class="col-var">-</td>`;
+    html += `</tr>`;
   }
 
-  html += `<td class="col-var">-</td>`;
-  html += `</tr>`;
-}
-
-html += `
+  html += `
 </tbody>
 </table>
 </div>
@@ -303,17 +278,55 @@ window.onload = calcularTabela;
 </html>
 `;
 
-// ===== SALVAR =====
-fs.writeFileSync(OUTPUT_FILE, html);
+  return html;
+}
 
-console.log("HTML gerado:", OUTPUT_FILE);
+// ===== MAIN (execução com API) =====
+async function main() {
+  const fiis = lerListaFiis();
+  if (fiis.length === 0) {
+    console.log("⚠️ lista_fiis.txt vazio ou não encontrado");
+    return;
+  }
 
-// ===== ABRIR =====
-const filePath = path.resolve(OUTPUT_FILE);
+  console.log(`📋 ${fiis.length} FIIs carregados\n`);
 
-let comando;
-if (process.platform === "win32") comando = `start "" "${filePath}"`;
-else if (process.platform === "darwin") comando = `open "${filePath}"`;
-else comando = `xdg-open "${filePath}"`;
+  let cache = lerCache();
+  console.log(`💾 Cache: ${cache.length} registros\n`);
 
-exec(comando);
+  // Buscar dividendos de cada FII na API
+  for (const ticker of fiis) {
+    try {
+      console.log(`🔍 Buscando ${ticker}...`);
+      const novos = await buscarDividendos(ticker);
+      console.log(`   ✅ ${novos.length} rendimentos encontrados`);
+      cache = mergeRendimentos(cache, novos);
+    } catch (e) {
+      console.log(`   ❌ Erro: ${e.message}`);
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  // Salvar cache atualizado
+  salvarCache(cache);
+  console.log(`\n💾 Cache salvo: ${cache.length} registros`);
+
+  // Gerar HTML
+  const html = gerarHTML(cache);
+  fs.writeFileSync(OUTPUT_FILE, html);
+  console.log("HTML gerado:", OUTPUT_FILE);
+
+  // Abrir
+  const filePath = path.resolve(OUTPUT_FILE);
+  let comando;
+  if (process.platform === "win32") comando = `start "" "${filePath}"`;
+  else if (process.platform === "darwin") comando = `open "${filePath}"`;
+  else comando = `xdg-open "${filePath}"`;
+  exec(comando);
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = { gerarHTML };
