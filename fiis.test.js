@@ -99,22 +99,32 @@ describe("mergeRendimentos", () => {
 })
 
 describe("geração HTML", () => {
-  test("fiis.js gera resultado.html a partir do cache", () => {
-    // Prepara cache de teste
-    const cacheFile = path.resolve(__dirname, "cache_rendimentos.csv")
-    const listaFile = path.resolve(__dirname, "lista_fiis.txt")
-    const backupCache = fs.existsSync(cacheFile) ? fs.readFileSync(cacheFile) : null
-    const backupLista = fs.existsSync(listaFile) ? fs.readFileSync(listaFile) : null
+  const cacheFile = path.resolve(__dirname, "cache_rendimentos.csv")
+  const listaFile = path.resolve(__dirname, "lista_fiis.txt")
+  let backupCache, backupLista
 
+  beforeEach(() => {
+    backupCache = fs.existsSync(cacheFile) ? fs.readFileSync(cacheFile) : null
+    backupLista = fs.existsSync(listaFile) ? fs.readFileSync(listaFile) : null
     fs.writeFileSync(listaFile, "TGAR11\nTRXF11\n")
     fs.writeFileSync(cacheFile, `ticker;data_com;data_pagamento;valor_por_cota
 TGAR11;30/12/2024;15/01/2025;1.10
 TGAR11;31/01/2025;14/02/2025;1.00
+TGAR11;28/02/2025;18/03/2025;1.00
 TRXF11;30/12/2024;15/01/2025;2.50
 TRXF11;31/01/2025;14/02/2025;0.93
+TRXF11;30/12/2025;15/01/2026;0.93
 `)
+  })
 
-    // Executa geração offline (sem API)
+  afterEach(() => {
+    if (backupCache) fs.writeFileSync(cacheFile, backupCache)
+    else if (fs.existsSync(cacheFile)) fs.unlinkSync(cacheFile)
+    if (backupLista) fs.writeFileSync(listaFile, backupLista)
+    else if (fs.existsSync(listaFile)) fs.unlinkSync(listaFile)
+  })
+
+  test("gera resultado.html a partir do cache", () => {
     const { gerarHTML } = require("./fiis")
     const html = gerarHTML()
 
@@ -123,11 +133,22 @@ TRXF11;31/01/2025;14/02/2025;0.93
     expect(html).toContain("Dividendos por Cota")
     expect(html).toContain("R$")
     expect(html).toContain("% Var")
+  })
 
-    // Restaura
-    if (backupCache) fs.writeFileSync(cacheFile, backupCache)
-    else if (fs.existsSync(cacheFile)) fs.unlinkSync(cacheFile)
-    if (backupLista) fs.writeFileSync(listaFile, backupLista)
-    else if (fs.existsSync(listaFile)) fs.unlinkSync(listaFile)
+  test("filtro exibe 'A partir de' com anos predefinidos", () => {
+    const { gerarHTML } = require("./fiis")
+    const html = gerarHTML()
+
+    expect(html).toContain("A partir de 2025")
+    expect(html).toContain("A partir de 2026")
+    expect(html).toContain('value="todos"')
+  })
+
+  test("filtrarAno usa lógica >= para mostrar do ano selecionado em diante", () => {
+    const { gerarHTML } = require("./fiis")
+    const html = gerarHTML()
+
+    // A lógica JS deve usar >= ao comparar anos
+    expect(html).toContain(">= ano")
   })
 })

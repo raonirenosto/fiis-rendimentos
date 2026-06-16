@@ -127,7 +127,7 @@ tbody tr:nth-child(even) { background: #e8f0ff; }
 
 <select id="filtroAno" onchange="filtrarAno()">
   <option value="todos">Todos</option>
-  ${anos.map(a => `<option value="${a}">${a}</option>`).join("")}
+  ${anos.map(a => `<option value="${a}">A partir de ${a}</option>`).join("")}
 </select>
 
 <br><br>
@@ -194,7 +194,7 @@ function calcularTabela() {
 
       const valor = parseFloat(texto.replace("R$", "").replace(",", "."));
 
-      if (anoSelecionado === "todos" || ano === anoSelecionado) {
+      if (anoSelecionado === "todos" || ano >= anoSelecionado) {
         dados.push({ td, valor, ano });
       }
 
@@ -260,11 +260,11 @@ function filtrarAno() {
     tds.forEach(td => td.style.display = "");
   } else {
     ths.forEach(th => {
-      th.style.display = th.dataset.ano === ano ? "" : "none";
+      th.style.display = th.dataset.ano >= ano ? "" : "none";
     });
 
     tds.forEach(td => {
-      td.style.display = td.dataset.ano === ano ? "" : "none";
+      td.style.display = td.dataset.ano >= ano ? "" : "none";
     });
   }
 
